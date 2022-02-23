@@ -1,0 +1,729 @@
+
+clc
+clear all
+close all
+
+%%Trelica Plana
+
+
+%Programando recebendo os dados de entrada do sistema
+printf("|||||||DADOS DE ENTRADA DO SISTEMA:||||||| \n " );
+
+tipo_2d_3d= input('Será uma treliça "2d" ou "3d"?? ', 's');
+
+if tipo_2d_3d == "2d"
+  
+unidade= input("Digite a unidade de medida em cm das coordenadas:  \n"); % unidade de distância do gráfico
+E=input("Digite o Módulo de Young em [kN/cm²]: \n");%Modulo de Young
+nelem=input("Qual o número de barras: \n" );%%Quantidade de barras
+nnods= input ("Quantos nós o conjunto possui? \n");%%Numero de nos
+
+##NDOF= nnods*2;
+K_global = zeros(2*nnods,2*nnods);
+
+%Criando laco com base no numero de elementos
+for i=1:nelem
+  
+%Digitando a Area da Secao transversal
+  printf("||||||| BARRA %i° ||||||||:\n", i)
+  printf("Digite a Área da seção transversal da barra %i em cm² :\n", i)
+  A(i) = input("");
+  
+% Adicionando os dados do nó 1 local
+  printf("Qual o número do primeiro nó na referência global?  \n")
+  no1global(i) = input(""); %% aqui eu pegarei qual o número do primeiro nó local na coordenada global
+  printf("Digite a coordenada X desse nó na barra %i: \n",i)
+  coorx(i,1) = input("");
+  printf("Digite a coordenada Y desse nó na barra %i: \n",i)
+  coory(i,1) = input("");
+  
+% Adicionando os dados do nó 2 local
+  printf("Qual o número do segundo nó na referência global?  \n")
+  no2global(i) = input("");%% aqui eu pegarei qual o número do segundo nó local na coordenada global
+  printf("Digite a coordenada X desse nó na barra %i : \n",i)
+  coorx (i,2) = input("");
+  printf("Digite a coordenada Y desse nó na barra %i : \n",i)
+  coory (i,2) = input("");
+
+%%Distancia com referência ao eixos da barra
+
+  distx(i)= (coorx (i,2) - coorx (i,1))*unidade  ; %distância no eixo x
+  disty(i)= (coory (i,2) - coory (i,1))*unidade  ; %distância no eixo y
+
+%%Distância da barra
+
+  Dist_total_barra(i) = sqrt((disty(i))^2 + distx(i)^2);
+
+
+%%Calculando angulo alfa
+  
+    alfa(i) = atan(disty(i)/distx(i));
+
+  
+
+
+  %% Matriz de rigidez local (k)
+
+  k_local{i} = (E*A(i)/Dist_total_barra(i))*[ cos(alfa(i))^2 cos(alfa(i))*sin(alfa(i)) -((cos(alfa(i)))^2) -(cos(alfa(i))*sin(alfa(i)));
+                                               cos(alfa(i))*sin(alfa(i)) (sin(alfa(i)))^2 -(cos(alfa(i))*sin(alfa(i))) -((sin(alfa(i)))^2);
+                                               -(cos(alfa(i)))^2 -(cos(alfa(i))*sin(alfa(i))) (cos(alfa(i)))^2 cos(alfa(i))*sin(alfa(i));
+                                               -(cos(alfa(i))*sin(alfa(i))) -(sin(alfa(i)))^2 cos(alfa(i))*sin(alfa(i)) (sin(alfa(i)))^2];
+
+%%Aqui será feito a matriz de rotação de cada barra que apesar de não usar no K_global(Pq a formula usada já foi considerada)
+%%Será utilizado futuramente encontrar os esforços na barra local
+                                           
+  matriz_rotacao {i} = [cos(alfa(i)) sin(alfa(i)) 0 0 ; 
+                 -sin(alfa(i)) cos(alfa(i)) 0 0;
+                 0 0 cos(alfa(i)) sin(alfa(i));
+                 0 0 -sin(alfa(i)) cos(alfa(i))];
+  %Criando matriz de incidência
+  
+  %Criando matriz de zeros com base no número de nós 
+    Matriz_de_incidencia = zeros(4,2*nnods);
+    
+  %Adicionando os valores com base nos graus de lib
+    Matriz_de_incidencia(1,2*no1global(i)-1) = 1;
+    Matriz_de_incidencia(2,2*no1global(i)) = 1;
+    Matriz_de_incidencia(3,2*no2global(i)-1) = 1;
+    Matriz_de_incidencia(4,2*no2global(i)) = 1;
+
+  %Matriz transposta   
+    Matriz_transposta= (Matriz_de_incidencia') ;
+    
+%Matriz Global Total
+    
+    K_global  = K_global + (Matriz_transposta*k_local{i}*Matriz_de_incidencia);
+      
+endfor
+
+
+
+
+ %% Definindo as forças Forças aplicadas nas Vigas
+
+printf("|||||||DADOS DE ENTRADA DAS FORÇAS:||||||| \n \n ");
+  
+  Forcas_aplic_sistem = zeros (2*nnods,1); %% criando de um vetor linha de zeros
+
+%%Forças em X
+  
+ F_dir_x= yes_or_no("Existem forças na direção X? \n"); %Força na direção X
+ 
+if   F_dir_x == 1
+  Qtd_forcas= input("Insira a quantidade de forças \n");
+  
+  for i=1:Qtd_forcas
+    
+    printf("Qual o valor em [kN] da %iº força aplicada em X? \n",i)
+    valor_Fx= input("");
+    printf("Qual o angulo(em relação ao eixo x) da %iº força aplicada em X ?\n",i)
+    angulo_Fx= input("");
+    nod_Fx= input("Em que nó esta essa força na referência? \n ");
+    Forcas_aplic_sistem(2*nod_Fx-1,1) = valor_Fx*cosd(angulo_Fx);
+    
+  endfor
+ 
+
+
+endif 
+ 
+%%Forças em Y
+ 
+F_dir_y = yes_or_no("Existem forças na direção y ? \n"); %Força na direção Y
+
+  if   F_dir_y == 1
+    Qtd_forcas= input("Insira a quantidade de forças \n");
+    
+    for i=1:Qtd_forcas
+      
+      printf("Qual o valor em [kN] da %iº força aplicada em Y ?\n",i)
+      valor_Fy= input("");
+      printf("Qual o angulo(em relação ao eixo y) da %iº força aplicada em Y ?\n",i)
+      angulo_Fy= input("");
+      nod_Fy= input("Em que nó esta essa força na referência? \n ");
+      Forcas_aplic_sistem(2*nod_Fy,1) = valor_Fy*cosd(angulo_Fy);
+      
+    endfor
+    
+    %Retornando apenas
+   
+  endif 
+
+
+
+
+  printf("|||||||DADOS DE ENTRADA DOS APOIOS:||||||| \n \n ");
+    
+%%Encontrando as reações do sistema   
+apoio_sistema = ones (2*nnods,1); %% criando um vetor linha de 1
+  
+  apoio_fixo = yes_or_no("Existem apoios fixos na estrutura? \n"); %Definindo a se existe apoios fixos
+
+if apoio_fixo == 1
+    Qtd_apoios_fixos= input("Quantos Apoios fixos existem? \n");
+    for i=1:Qtd_apoios_fixos
+     printf("Qual o nó que o %iº apoio fixo esta? \n",i);
+     nods_fixo= input("");
+     apoio_sistema(2*nods_fixo - 1, 1) = 0;
+     apoio_sistema((2*nods_fixo), 1) = 0;
+    endfor
+    
+
+  endif
+
+ 
+
+
+ 
+  apoio_movel = yes_or_no("Existem apoios móveis na estrutura? \n"); %Definindo a se existe apoios móveis
+
+if apoio_movel == 1
+       
+    Qtd_apoios_moveis= input("Quantos Apoios móveis existem ? \n");
+    
+    for i=1:Qtd_apoios_moveis
+     printf("Qual o nó que o %iº apoio móvel esta? \n",i); 
+     nods_movel= input("");
+     movel_x_or_y= input ("Esse apoio restringe em 'x' ou 'y'? \n", "c"); %%% ta dando errado ainda
+      
+      if  movel_x_or_y == "x"
+         apoio_sistema((2*nods_movel-1),1) = 0;
+      elseif movel_x_or_y == "y"
+         apoio_sistema((2*nods_movel),1) = 0;
+      endif
+         
+    endfor
+    
+endif 
+ 
+ 
+
+
+%%Criando as matrizes que serão utilizadas
+ 
+K_dd=K_global; %% criando a matriz K_dd semelhante a global
+K_rd=K_global;%% criando a matriz D semelhante a global
+Forcas_aplic_1 = Forcas_aplic_sistem; %%Criando a matriz que será utlizadas para achar deslocamento
+Forcas_aplic_2 = Forcas_aplic_sistem; %%Criando matriz que será utilizadas para achar reações nas barras
+
+
+
+%%Apagando linhas e colunas que o deslocamento é zero
+
+contador_1=1; %Esse contador conta sempre que EXISTE movimento na direção
+
+for i= 1:(2*nnods)
+  if apoio_sistema(i) == 0
+    
+    K_dd(:,contador_1)=[];
+    K_dd(contador_1,:)=[];
+  
+  else 
+   
+    contador_1 = contador_1 + 1;
+      
+  endif
+endfor
+
+
+%%Criando K_rd
+
+
+contador_1=1; %Esse contator conta sempre que EXISTE movimento na direção
+contador_2=1;% %Esse contator conta sempre que NÃO EXISTE movimento na direção
+
+%Apagando colunas que o deslocamento é zero e deixando linhas que o deslocamento é zero
+
+for i= 1:(2*nnods)
+  if apoio_sistema(i) == 0       
+    K_rd(:,contador_1)=[];%% Tirando apenas a coluna quando deslocamento é 0
+    contador_2=contador_2+1;
+   else 
+    K_rd(contador_2,:)=[];  
+    contador_1 = contador_1 + 1;      
+  endif
+endfor
+
+
+
+
+%% Apagando as linhas que é o deslocamento é zero
+contador_1=1; %
+for i= 1:(2*nnods)
+  if apoio_sistema(i) == 0  
+    Forcas_aplic_1(contador_1,:)=[]; %% Deletando a linha que o contador esta   
+   else   
+    contador_1 = contador_1 + 1;     
+  endif
+endfor
+
+
+
+%% Encontrando o vetor deslocamento 
+   
+Deslocamento_u = (inv(K_dd))*Forcas_aplic_1;
+
+
+%% Modificando a Forcas_aplic_2
+%% Apagando as linhas que o deslocamento NÃO É ZERO
+
+contador_1=1; %
+for i= 1:(2*nnods)
+  if apoio_sistema(i) == 1  
+    Forcas_aplic_2(contador_1,:)=[]; %%    
+   else   
+    contador_1 = contador_1 + 1;
+     
+  endif
+endfor
+
+
+
+%% Encontrando o vetor de apoios em [kN]
+
+Vetor_reacoes= (K_rd*Deslocamento_u) - Forcas_aplic_2;
+
+%% Encontrando o vetor de apoio geral
+
+Vetor_reacoes_geral= zeros (2*nnods,1);
+
+contador_1=1;
+
+for i= 1:(2*nnods)
+  if apoio_sistema(i) == 0  
+    Vetor_reacoes_geral(i)= Vetor_reacoes(contador_1); %%   
+    contador_1 = contador_1 + 1; 
+  endif
+endfor
+
+
+
+%%Criando umas matriz de deslocamento para os pontos no sistema global
+
+Deslocamento_u_geral = zeros (2*nnods,1);
+
+contador_1=1; %
+
+for i= 1:(2*nnods)
+  if apoio_sistema(i) == 1  
+    Deslocamento_u_geral(i)= Deslocamento_u(contador_1); %%   
+    contador_1 = contador_1 + 1; 
+  endif
+endfor
+
+
+%%Matriz Matriz N_Local
+%%Para achar a matriz de deslocamentos nodais N, é preciso converter os deslocamento Local em 
+u_local = zeros (4,1);
+
+for i=1:nelem
+   u_local(1) = Deslocamento_u_geral (2*no1global (i)-1,1);
+   u_local(2) = Deslocamento_u_geral (2*no1global (i),1);
+   u_local(3) = Deslocamento_u_geral (2*no2global (i)-1,1);
+   u_local(4) = Deslocamento_u_geral (2*no2global (i),1);
+   u_local_barra{i} = u_local; %%Gravando o u_local na respectiva barra
+endfor
+
+
+%%Fazendo a matriz de esforço locais
+for i=1:nelem
+  N_local{i} = matriz_rotacao{i} * k_local{i} * u_local_barra{i};
+endfor
+
+
+
+%% PRINTANDO TUDO NA TELA DE COMANDO %%
+
+printf("|||||||Esforcos nas Barras:||||||| \n \n ");
+for i=1:nelem
+    printf('Esforço da Barra %d \n', i);
+    round(N_local{i})
+  endfor
+
+printf("|||||||MATRIZ DE DESLOCAMENTO DOS PONTOS:||||||| \n \n ");
+  (Deslocamento_u_geral)
+  
+  
+printf("|||||||Vetor de reações de apoio Global||||||| \n \n "); 
+  round(Vetor_reacoes_geral)
+
+printf("|||||||MATRIZ DE RIGIDEZ GLOBAL:||||||| \n \n ");   
+  round(K_global)   
+ 
+endif
+ 
+if tipo_2d_3d == "3d"
+
+unidade= input("Digite a unidade de medida em cm das coordenadas:  \n"); % unidade de distancia do grafico
+E=input("Digite o Módulo de Young em [kN/cm²]: \n");%Modulo de Young
+nelem=input("Qual o número de barras: \n" );%%Quantidade de barras
+nnods= input ("Quantos nós o conjunto possui? \n");%%Numero de nos
+##NDOF= nnods*3;
+K_global = zeros(3*nnods,3*nnods); 
+
+for i=1:nelem
+  
+%Digitando a Área da Seção transversal
+  printf("||||||| BARRA %i° ||||||||:\n", i)
+  printf("Digite a Área da seção transversal da barra %i em cm² :\n", i)
+  A(i) = input("");
+
+
+
+% Adicionando os dados do nó 1 local
+  printf("Qual o número do primeiro nó na referência global?  \n")
+  no1global(i) = input(""); %% aqui eu pegarei qual o número do primeiro nó local na coordenada global
+  printf("Digite a coordenada X desse nó na barra %i: \n",i)
+  coorx(i,1) = input("");
+  printf("Digite a coordenada Y desse nó na barra %i: \n",i)
+  coory(i,1) = input("");
+  printf("Digite a coordenada Z desse nó na barra %i: \n",i)
+  coorz(i,1) = input("");
+  
+% Adicionando os dados do nó 2 local
+  printf("Qual o número do segundo nó na referência global?  \n")
+  no2global(i) = input("");%% aqui eu pegarei qual o número do segundo nó local na coordenada global
+  printf("Digite a coordenada X desse nó na barra %i : \n",i)
+  coorx (i,2) = input("");
+  printf("Digite a coordenada Y desse nó na barra %i : \n",i)
+  coory (i,2) = input("");
+  printf("Digite a coordenada Z desse nó na barra %i: \n",i)
+  coorz(i,2) = input("");
+
+%%Distancia com referência ao eixos da barra
+
+  distx(i)= (coorx (i,2) - coorx (i,1))*unidade  ; %distância no eixo x
+  disty(i)= (coory (i,2) - coory (i,1))*unidade  ; %distância no eixo y
+  distz(i)= (coorz (i,2) - coorz (i,1))*unidade  ; %distância no eixo z
+%%Distância da barra
+
+  Dist_total_barra(i) = sqrt((disty(i))^2 + distx(i)^2 + distz(i)^2);
+
+%%Calculando angulo alfa
+  
+  alfa(i) = acos(distx(i)/Dist_total_barra(i)); %% Pegando o angulo alfa em relação ao eixo X
+  beta(i) = acos(disty(i)/Dist_total_barra(i)); %% Pegando o angulo alfa em relação ao eixo Y
+  gama(i) = acos(distz(i)/Dist_total_barra(i)); %% Pegando o angulo alfa em relação ao eixo Z
+  
+  
+%% Matriz de rigidez local (k)
+
+##  k_local{i} = (E*A(i)/Dist_total_barra(i))* (cos(alfa(i)))^2 cos(alfa(i))*cos(beta(i)) cos(alfa(i))*cos(gama(i)) -((cos(alfa(i)))^2) -(cos(alfa(i))*cos(beta(i))) -(cos(alfa(i))*cos(gama(i)));
+##                                              cos(beta(i))*cos(alfa(i)) (cos(beta(i)))^2 cos(beta(i))*cos(gama(i)) -(cos(beta(i))*cos(alfa(i))) -((cos(beta(i)))^2) -(cos(beta(i))*cos(gama(i)));
+##                                              cos(gama(i))*cos(alfa(i)) cos(gama(i))*cos(beta(i)) (cos(gama(i)))^2 -(cos(gama(i))*cos(alfa(i))) -(cos(gama(i))*cos(beta(i))) -((cos(gama(i)))^2);
+##                                              -((cos(alfa(i)))^2) -(cos(alfa(i))*cos(beta(i))) -(cos(alfa(i))*cos(gama(i))) (cos(alfa(i)))^2 cos(alfa(i))*cos(beta(i)) cos(alfa(i))*cos(gama(i));
+##                                              -(cos(beta(i))*cos(alfa(i))) -((cos(beta(i)))^2) -(cos(beta(i))*cos(gama(i))) cos(beta(i))*cos(alfa(i)) (cos(beta(i)))^2 cos(beta(i))*cos(gama(i));
+##                                              -(cos(gama(i))*cos(alfa(i))) -(cos(gama(i))*cos(beta(i))) -((cos(gama(i)))^2) cos(gama(i))*cos(alfa(i)) cos(gama(i))*cos(beta(i)) (cos(gama(i)))^2];
+
+
+k_local {i} =(E*A(i)/Dist_total_barra(i))*[(cos(alfa(i)))^2 cos(alfa(i))*cos(beta(i)) cos(alfa(i))*cos(gama(i)) -((cos(alfa(i)))^2) -(cos(alfa(i))*cos(beta(i))) -(cos(alfa(i))*cos(gama(i)));
+                                           cos(beta(i))*cos(alfa(i)) (cos(beta(i)))^2 cos(beta(i))*cos(gama(i)) -(cos(beta(i))*cos(alfa(i))) -((cos(beta(i)))^2) -(cos(beta(i))*cos(gama(i)));
+                                           cos(gama(i))*cos(alfa(i)) cos(gama(i))*cos(beta(i)) (cos(gama(i)))^2 -(cos(gama(i))*cos(alfa(i))) -(cos(gama(i))*cos(beta(i))) -((cos(gama(i)))^2);
+                                           -((cos(alfa(i)))^2) -(cos(alfa(i))*cos(beta(i))) -(cos(alfa(i))*cos(gama(i))) (cos(alfa(i)))^2 cos(alfa(i))*cos(beta(i)) cos(alfa(i))*cos(gama(i));
+                                           -(cos(beta(i))*cos(alfa(i))) -((cos(beta(i)))^2) -(cos(beta(i))*cos(gama(i))) cos(beta(i))*cos(alfa(i)) (cos(beta(i)))^2 cos(beta(i))*cos(gama(i));
+                                           -(cos(gama(i))*cos(alfa(i))) -(cos(gama(i))*cos(beta(i))) -((cos(gama(i)))^2) cos(gama(i))*cos(alfa(i)) cos(gama(i))*cos(beta(i)) (cos(gama(i)))^2]
+ 
+%%Aqui será feito a matriz de rotação de cada barra que apesar de não usar no K_global(Pq a formula usada já foi considerada)
+%%Será utilizado futuramente encontrar os esforços na barra local
+ 
+ matriz_rotacao{i} = [cos(alfa(i)) cos(alfa(i))*cos(beta(i)) cos(alfa(i))*cos(gama(i)) 0 0 0;
+                       cos(beta(i))*cos(alfa(i)) cos(beta(i)) cos(beta(i))*cos(gama(i)) 0 0 0;
+                       cos(gama(i))*cos(alfa(i)) cos(gama(i))*cos(beta(i)) cos(gama(i)) 0 0 0;
+                       0 0 0 cos(alfa(i)) cos(alfa(i))*cos(beta(i)) cos(alfa(i))*cos(gama(i));
+                       0 0 0 cos(beta(i))*cos(alfa(i)) cos(beta(i)) cos(beta(i))*cos(gama(i));
+                       0 0 0 cos(gama(i))*cos(alfa(i)) cos(gama(i))*cos(beta(i)) cos(gama(i))];
+ 
+ 
+%Criando matriz de incidência
+  
+  %Criando matriz de zeros com base no número de nós 
+    Matriz_de_incidencia = zeros(6,3*nnods);
+    
+  %Adicionando os valores com base nos graus de lib
+    Matriz_de_incidencia(1,3*no1global(i)-2) = 1;
+    Matriz_de_incidencia(2,3*no1global(i)-1) = 1;
+    Matriz_de_incidencia(3,3*no1global(i)) = 1;
+    Matriz_de_incidencia(4,3*no2global(i)-2) = 1;
+    Matriz_de_incidencia(5,3*no2global(i)-1) = 1; 
+    Matriz_de_incidencia(6,3*no2global(i)) = 1;
+    
+    
+  
+  %Matriz transposta   
+    Matriz_transposta= (Matriz_de_incidencia') ;
+    
+  %Matriz Global Total
+    
+    K_global  = K_global + (Matriz_transposta*k_local{i}*Matriz_de_incidencia);
+
+
+endfor
+
+
+
+ %% Definindo as forças Forças aplicadas nas Vigas
+
+printf("|||||||DADOS DE ENTRADA DAS FORÇAS:||||||| \n \n ");
+  
+  Forcas_aplic_sistem = zeros (3*nnods,1); %% criando de um vetor linha de zeros
+ 
+%%Forças em X 
+  
+  F_dir_x= yes_or_no("Existem forças na direção X? \n"); %Força na direção X
+
+if   F_dir_x == 1
+  Qtd_forcas= input("Insira a quantidade de forças \n");
+  
+  for i=1:Qtd_forcas
+    
+    printf("Qual o valor em [kN] da %iº força aplicada em X? \n",i)
+    valor_Fx= input("");
+    printf("Qual o angulo(em relação ao eixo x) da %iº força aplicada em X ?\n",i)
+    angulo_Fx= input("");
+    nod_Fx= input("Em que nó esta essa força na referência? \n ");
+    Forcas_aplic_sistem(3*nod_Fx-2,1) = valor_Fx*cosd(angulo_Fx);
+    
+  endfor
+endif
+
+%%Forças em Y
+
+  F_dir_y = yes_or_no("Existem forças na direção y ? \n"); %Força na direção Y
+
+  if   F_dir_y == 1
+    Qtd_forcas= input("Insira a quantidade de forças \n");
+    
+    for i=1:Qtd_forcas
+      
+      printf("Qual o valor em [kN] da %iº força aplicada em Y ?\n",i)
+      valor_Fy= input("");
+      printf("Qual o angulo(em relação ao eixo y) da %iº força aplicada em Y ?\n",i)
+      angulo_Fy= input("");
+      nod_Fy= input("Em que nó esta essa força na referência? \n ");
+      Forcas_aplic_sistem(3*nod_Fy-1,1) = valor_Fy*cosd(angulo_Fy);
+      
+    endfor
+  endif   
+%%Forças em Z    
+
+F_dir_z = yes_or_no("Existem forças na direção Z ? \n"); %Força na direção Y
+
+  if   F_dir_z == 1
+    Qtd_forcas= input("Insira a quantidade de forças \n");
+    
+    for i=1:Qtd_forcas
+      
+      printf("Qual o valor em [kN] da %iº força aplicada em z ?\n",i)
+      valor_Fz= input("");
+      printf("Qual o angulo(em relação ao eixo Z) da %iº força aplicada em Z ?\n",i)
+      angulo_Fz= input("");
+      nod_Fz= input("Em que nó esta essa força na referência? \n ");
+      Forcas_aplic_sistem(3*nod_Fz,1) = valor_Fz*cosd(angulo_Fz);
+      
+    endfor
+    
+  endif
+
+  
+printf("|||||||DADOS DE ENTRADA DOS APOIOS:||||||| \n \n ");
+    
+%%Encontrando as reações do sistema   
+apoio_sistema = ones (3*nnods,1); %% criando um vetor linha de 1
+  
+  apoio_fixo = yes_or_no("Existem apoios fixos na estrutura? \n"); %Definindo a se existe apoios fixos
+
+if apoio_fixo == 1
+    Qtd_apoios_fixos= input("Quantos Apoios fixos existem? \n");
+    for i=1:Qtd_apoios_fixos
+     printf("Qual o nó que o %iº apoio fixo esta? \n",i);
+     nods_fixo= input("");
+     apoio_sistema(3*nods_fixo - 2, 1) = 0;
+     apoio_sistema((3*nods_fixo)-1, 1) = 0;
+     apoio_sistema((3*nods_fixo), 1) = 0;
+    endfor
+    
+
+endif
+
+
+apoio_movel = yes_or_no("Existem apoios móveis na estrutura? \n"); %Definindo a se existe apoios móveis
+
+if apoio_movel == 1
+       
+    Qtd_apoios_moveis= input("Quantos Apoios móveis existem ? \n");
+    
+    for i=1:Qtd_apoios_moveis
+     printf("Qual o nó que o %iº apoio móvel esta? \n",i); 
+     nods_movel= input("");
+     movel_x_or_y_z= input ("Esse apoio restringe em 'x' ou 'y' ou 'z'? \n", "c"); %%% ta dando errado ainda
+      
+      if  movel_x_or_y_z == "x"
+         apoio_sistema((3*nods_movel-1),1) = 0;
+         apoio_sistema((3*nods_movel),1) = 0;
+      elseif movel_x_or_y_z == "y"
+         apoio_sistema((3*nods_movel - 2),1) = 0;
+         apoio_sistema((3*nods_movel),1) = 0;
+      elseif movel_x_or_y_z == "z"
+         apoio_sistema((3*nods_movel-2),1) = 0;
+         apoio_sistema((3*nods_movel-1),1) = 0;
+      endif
+         
+    endfor
+    
+endif 
+
+
+%%Criando as matrizes que serão utilizadas
+ 
+K_dd=K_global; %% criando a matriz K_dd semelhante a global
+K_rd=K_global;%% criando a matriz D semelhante a global
+Forcas_aplic_1 = Forcas_aplic_sistem; %%Criando a matriz que será utlizadas para achar deslocamento
+Forcas_aplic_2 = Forcas_aplic_sistem; %%Criando matriz que será utilizadas para achar reações nas barras
+
+
+
+%%Apagando linhas e colunas que o deslocamento é zero
+
+contador_1=1; %Esse contador conta sempre que EXISTE movimento na direção
+
+for i= 1:(3*nnods)
+  if apoio_sistema(i) == 0
+    
+    K_dd(:,contador_1)=[];
+    K_dd(contador_1,:)=[];
+  
+  else 
+   
+    contador_1 = contador_1 + 1;
+      
+  endif
+endfor
+
+
+%%Criando K_rd
+
+
+contador_1=1; %Esse contator conta sempre que EXISTE movimento na direção
+contador_2=1;% %Esse contator conta sempre que NÃO EXISTE movimento na direção
+
+%Apagando colunas que o deslocamento é zero e deixando linhas que o deslocamento é zero
+
+for i= 1:(3*nnods)
+  if apoio_sistema(i) == 0       
+    K_rd(:,contador_1)=[];%% Tirando apenas a coluna quando deslocamento é 0
+    contador_2=contador_2+1;
+   else 
+    K_rd(contador_2,:)=[];  
+    contador_1 = contador_1 + 1;      
+  endif
+endfor
+
+
+
+
+%% Apagando as linhas que é o deslocamento é zero
+contador_1=1; %
+for i= 1:(3*nnods)
+  if apoio_sistema(i) == 0  
+    Forcas_aplic_1(contador_1,:)=[]; %% Deletando a linha que o contador esta   
+   else   
+    contador_1 = contador_1 + 1;     
+  endif
+endfor
+
+
+
+%% Encontrando o vetor deslocamento 
+   
+Deslocamento_u = (inv(K_dd))*Forcas_aplic_1;
+
+
+%% Modificando a Forcas_aplic_2
+%% Apagando as linhas que o deslocamento NÃO É ZERO
+
+contador_1=1; %
+for i= 1:(3*nnods)
+  if apoio_sistema(i) == 1  
+    Forcas_aplic_2(contador_1,:)=[]; %%    
+   else   
+    contador_1 = contador_1 + 1;
+     
+  endif
+endfor
+
+
+
+%% Encontrando o vetor de apoios em [kN]
+
+Vetor_reacoes= (K_rd*Deslocamento_u) - Forcas_aplic_2;
+
+%% Encontrando o vetor de apoio geral
+
+Vetor_reacoes_geral= zeros (3*nnods,1);
+
+contador_1=1;
+
+for i= 1:(3*nnods)
+  if apoio_sistema(i) == 0  
+    Vetor_reacoes_geral(i)= Vetor_reacoes(contador_1); %%   
+    contador_1 = contador_1 + 1; 
+  endif
+endfor
+
+
+
+%%Criando umas matriz de deslocamento para os pontos no sistema global
+
+Deslocamento_u_geral = zeros (3*nnods,1);
+
+contador_1=1; %
+
+for i= 1:(3*nnods)
+  if apoio_sistema(i) == 1  
+    Deslocamento_u_geral(i)= Deslocamento_u(contador_1); %%   
+    contador_1 = contador_1 + 1; 
+  endif
+endfor
+
+
+%%Matriz Matriz N_Local
+%%Para achar a matriz de deslocamentos nodais N, é preciso converter os deslocamento Local em 
+u_local = zeros (6,1);
+
+for i=1:nelem
+   u_local(1) = Deslocamento_u_geral (3*no1global (i)-2,1);
+   u_local(2) = Deslocamento_u_geral (3*no1global (i)-1,1);
+   u_local(3) = Deslocamento_u_geral (3*no1global (i),1);
+   u_local(4) = Deslocamento_u_geral (3*no2global (i)-2,1);
+   u_local(5) = Deslocamento_u_geral (3*no2global (i)-1,1);
+   u_local(6) = Deslocamento_u_geral (3*no2global (i),1);
+   u_local_barra{i} = u_local; %%Gravando o u_local na respectiva barra
+endfor
+
+
+%%Fazendo a matriz de esforço locais
+for i=1:nelem
+  N_local{i} = matriz_rotacao{i} * k_local{i} * u_local_barra{i};
+endfor
+
+
+
+%% PRINTANDO TUDO NA TELA DE COMANDO %%
+
+printf("|||||||Esforcos nas Barras:||||||| \n \n ");
+for i=1:nelem
+    printf('Esforço da Barra %d \n', i);
+    round(N_local{i})
+endfor
+
+printf("|||||||MATRIZ DE DESLOCAMENTO DOS PONTOS:||||||| \n \n ");
+  (Deslocamento_u_geral)
+  
+  
+printf("|||||||Vetor de reações de apoio Global||||||| \n \n "); 
+  round(Vetor_reacoes_geral)
+
+printf("|||||||MATRIZ DE RIGIDEZ GLOBAL:||||||| \n \n ");   
+  round(K_global)   
+  
+endif
